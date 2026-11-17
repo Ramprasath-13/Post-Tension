@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2-Storey Post-Tensioned Building – 3D</title>
+<style>
+:root{--bg:#060f24;--panel:#0b1730;--line:#1f3557;--tx:#f3f6fb;--mut:#9fb2cc;color-scheme:dark}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font:13px/1.35 system-ui,sans-serif}
+.app{display:grid;height:100%;grid-template-columns:272px 1fr 190px;grid-template-rows:1fr auto;grid-template-areas:"l s r" "i i i"}
+#stage{grid-area:s;min-height:0}#stage canvas{display:block;width:100%;height:100%}
+.pan{background:var(--panel);overflow-y:auto;padding:10px 12px}#l{grid-area:l;border-right:1px solid var(--line)}#r{grid-area:r;border-left:1px solid var(--line)}
+h3{margin:12px 0 4px;font-size:12px;color:#ff8c1a;text-transform:uppercase}
+.row{display:block;margin:6px 0}.row span{color:var(--mut)}.row o{float:right;color:var(--tx)}.row input{width:100%}
+.chk input[type=color]{width:34px;height:24px;padding:0;border:1px solid var(--line);background:none}.chk{display:flex;gap:6px;align-items:center;margin:6px 0}
+#info{grid-area:i;background:var(--panel);border-top:1px solid var(--line);padding:6px 12px;color:var(--mut);font-size:12px;max-height:28vh;overflow-y:auto}
+#info b{color:var(--tx)}.ok{color:#3fb950}.bad{color:#ff6b6b}.w{color:#ffb060}
+@media(max-width:820px){html,body{height:auto}.app{display:block;height:auto}#stage{height:52vh;position:sticky;top:0;z-index:5}}
+</style></head><body>
+<div class="app"><div id="stage"></div><aside class="pan" id="l"></aside><aside class="pan" id="r"></aside><div id="info"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+const P={Sx:8000,Sy:8000,H:3500,ts:200,bw:400,bd:600,cs:450,nTb:2,tsp:1200,eLow:180,eHigh:150,colExt:800,sbs:200,br:5,opB:.18,opC:.3,stD:10,stSp:200,stSe:100,stZn:600,ctD:10,ctSp:150,stx:.25,opS:.18,nBm:3,ftS:2000,ftT:600,nSt:4,opD:.3};
+const S=[["h","Geometry (3 × 3 columns, 2 storeys)"],["Sx","Bay span X",4000,12000,250],["Sy","Bay span Y",4000,12000,250],["H","Storey height",2800,5000,100],["ts","Slab thickness",200,300,10],["bw","Beam width",300,2000,25],["bd","Beam depth",450,1500,50],["cs","Column size",350,1200,50],
+["h","Post-tensioning"],["nTb","Tendons per beam",1,7,1],["nSt","Strands per tendon (Ø15.2)",1,19,1],["opD","Duct opacity",.1,1,.05],["tsp","Slab tendon spacing",600,2000,100],["eLow","Beam tendon low pt (below centroid)",50,240,5],["eHigh","Beam tendon high pt (above centroid)",50,240,5],
+["h","Stirrups & column ties"],["nBm","Beam main bars per layer (top & bottom) = stirrup legs",2,15,1],["stD","Beam stirrup Ø",8,16,2],["stSp","Beam stirrup spacing (mid-span)",100,400,25],["stSe","Beam stirrup spacing (near columns)",50,300,25],["stZn","Close-spacing zone from column face",0,1500,50],["ctD","Column tie Ø",8,16,2],["ctSp","Column tie spacing",75,400,25],
+["h","Footings"],["ftS","Footing size (0 = none)",0,4000,100],["ftT","Footing thickness",300,1000,50],
+["h","Reinforcement / display"],["colExt","Column bars above roof",0,1500,50],["sbs","Slab bar spacing (Ø10, top & bottom)",100,300,25],["stx","Slab top bars from support (× span; used if slab < 300)",.1,.4,.05],["br","Beam bar bend radius",5,60,5],["opB","Beam opacity",.05,1,.05],["opS","Slab opacity",.05,1,.05],["opC","Column opacity",.05,1,.05]];
+const V={col:1,beam:1,slab:1,duct:1,strand:1,ftg:1,fbar:1,bbar:1,stir:1,cbar:1,ctie:1,stp:1,sbt:1,grid:1},VL={col:"Columns",beam:"Beams",slab:"Slabs",duct:"Tendon ducts & anchorages",strand:"Strands",ftg:"Footings",fbar:"Footing bars",bbar:"Beam bars",stir:"Beam stirrups",cbar:"Column bars",ctie:"Column ties",stp:"Slab top bars",sbt:"Slab bottom bars",grid:"Ground grid"};
+const stage=document.getElementById("stage"),R=new THREE.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio||1,2));stage.append(R.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x060f24);
+const cam=new THREE.PerspectiveCamera(40,1,50,300000),ctl=new THREE.OrbitControls(cam,R.domElement);ctl.enableDamping=true;
+scene.add(new THREE.HemisphereLight(0xffffff,0x334455,.9));const sun=new THREE.DirectionalLight(0xffffff,.7);sun.position.set(1,2,1.4);scene.add(sun);
+const grid=new THREE.GridHelper(60000,60,0x2a4468,0x1a2c46);scene.add(grid);
+const MS=o=>new THREE.MeshStandardMaterial(o);
+const M={conc:MS({color:0xd4d5d8,roughness:.95,transparent:true,depthWrite:false}),slab:MS({color:0xd4d5d8,roughness:.95,transparent:true,depthWrite:false}),ftg:MS({color:0xa7adb6,roughness:.9,transparent:true,depthWrite:false}),fbar:MS({color:0xffa94d,roughness:.5}),col:MS({color:0xa7adb6,roughness:.9,transparent:true,depthWrite:false}),
+duct:MS({color:0x19b5a5,emissive:0x0a3a35,roughness:.5,metalness:.3,transparent:true,depthWrite:false}),sduct:MS({color:0x19b5a5,emissive:0x0a3a35,roughness:.5,metalness:.3}),str:MS({color:0xeef2f7,metalness:.5,roughness:.35}),plate:MS({color:0x3b82f6,roughness:.5}),head:MS({color:0xdfe5ec,metalness:.35,roughness:.4}),wedge:MS({color:0xef4444,roughness:.5}),strand:MS({color:0xf2f5f8,emissive:0x303840,roughness:.4}),
+bar:MS({color:0xd9843f,roughness:.5}),cbar:MS({color:0x4da3ff,roughness:.5}),sbot:MS({color:0xffd23f,roughness:.5}),stop:MS({color:0xff6fae,roughness:.5}),stir:MS({color:0x3fb950,roughness:.5}),tie:MS({color:0xc77dff,roughness:.5})};
+const G={};for(const k of["col","beam","slab","duct","strand","ftg","fbar","bbar","cbar","stp","sbt","stir","ctie"]){G[k]=new THREE.Group();scene.add(G[k])}
+const clear=g=>{g.traverse(o=>{o.geometry&&o.geometry.dispose()});while(g.children.length)g.remove(g.children[0])};
+const V3=(x,y,z)=>new THREE.Vector3(x,y,z),EM=new THREE.LineBasicMaterial({color:0xb9c3d2,transparent:true,opacity:.6});
+function box(g,w,h,d,x,y,z,m){const geo=new THREE.BoxGeometry(w,h,d),mesh=new THREE.Mesh(geo,m);mesh.position.set(x,y,z);g.add(mesh);const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo),EM);e.position.copy(mesh.position);g.add(e)}
+function tube(g,pts,r,m){g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),Math.max(40,pts.length*3),r,8),m))}
+/* draped profile over 2 spans: high at supports/ends (hi), low at midspans (lo); offset from centreline */
+function prof(s,Sp,lo,hi){if(Math.abs(s)>=Sp)return hi;const a=(s+Sp)/Sp,t=a-Math.floor(a);return hi-(hi+lo)*4*t*(1-t)}
+/* bar with 90-degree bends at both ends: [s,y] points; up = hook direction (-1 down, +1 up) */
+function bent(a,b,y,up,h,r){const p=[[a,y+up*(r+h)],[a,y+up*r]];
+ for(let i=1;i<=8;i++){const g=Math.PI+up*Math.PI/2*i/8;p.push([a+r+r*Math.cos(g),y+up*r+r*Math.sin(g)])}p.push([b-r,y]);
+ for(let i=1;i<=8;i++){const g=-up*Math.PI/2*(1-i/8);p.push([b-r+r*Math.cos(g),y+up*r+r*Math.sin(g)])}p.push([b,y+up*r],[b,y+up*(r+h)]);return p}
+/* anchorage template, local +x = outward: live = plate + head + wedge + strand tail; dead = plate + embedded bulb */
+function anc(sc,live){const g=new THREE.Group(),m=(geo,mat,x)=>{const o=new THREE.Mesh(geo,mat);o.position.x=x;g.add(o)};
+ m(new THREE.BoxGeometry(20,sc*150,sc*150),M.plate,10);
+ if(live){const h=new THREE.CylinderGeometry(sc*38,sc*28,40,16);h.rotateZ(Math.PI/2);m(h,M.head,40);
+  const w=new THREE.ConeGeometry(sc*14,26,10);w.rotateZ(-Math.PI/2);m(w,M.wedge,73);
+  const t=new THREE.CylinderGeometry(sc*8,sc*8,200,8);t.rotateZ(Math.PI/2);m(t,M.strand,186)}
+ else{const b=new THREE.SphereGeometry(sc*40,12,10);b.scale(2.2,1,1);m(b,M.sduct,-70)}
+ return g}
+function anchor(g,t,pts,dir,ls,le){for(const[q,l,ry]of[[pts[0],ls,dir?Math.PI/2:Math.PI],[pts[pts.length-1],le,dir?-Math.PI/2:0]]){const a=t[l?0:1].clone();a.position.copy(q);a.rotation.y=ry;g.add(a)}}
+/* closed rounded hoop (arcs concentric with the corner bar, as in the reference); m maps (u,v) to 3D */
+class Arc2 extends THREE.Curve{constructor(u,v,r,a,m){super();this.u=u;this.v=v;this.r=r;this.a=a;this.m=m}
+ getPoint(t,o=new THREE.Vector3()){const a=this.a+t*Math.PI/2;return o.copy(this.m(this.u+this.r*Math.cos(a),this.v+this.r*Math.sin(a)))}}
+function loopG(hu,hv,r,sd,m,seg){const p=new THREE.CurvePath(),L=(a,b)=>p.add(new THREE.LineCurve3(m(...a),m(...b))),A=(u,v,a)=>p.add(new Arc2(u,v,r,a,m)),H=Math.PI/2,x=hu-r,y=hv-r;
+ L([-x,-hv],[x,-hv]);A(x,-y,-H);L([hu,-y],[hu,y]);A(x,y,0);L([x,hv],[-x,hv]);A(-x,y,H);L([-hu,y],[-hu,-y]);A(-x,-y,2*H);
+ return new THREE.TubeGeometry(p,seg,sd/2,6,true)}
+function stPos(a,b){const m=(a+b)/2,o=[];for(let x=a+50;x<=m;x+=x-a<P.stZn?P.stSe:P.stSp)o.push(x);if(!o.length)return o;const q=o[o.length-1];return o.concat(o.map(x=>a+b-x).reverse().filter(x=>x-q>.6*P.stSe))}
+/* strand centres (dl lateral, dy vertical) inside a duct: Ø15.2 strands in a packed bundle (1, ring of up to 6, +centre, +outer ring of up to 12) */
+function stp(n){const r=7.6;if(n===1)return[[0,0]];const p=[];
+ if(n<=6){const R=Math.max(r,r/Math.sin(Math.PI/n))+.3;for(let i=0;i<n;i++){const a=2*Math.PI*i/n+Math.PI/2;p.push([R*Math.cos(a),R*Math.sin(a)])}return p}
+ p.push([0,0]);const k=Math.min(6,n-1);for(let i=0;i<k;i++){const a=2*Math.PI*i/6;p.push([15.5*Math.cos(a),15.5*Math.sin(a)])}
+ for(let i=0;i<n-1-k;i++){const a=2*Math.PI*i/12+.26;p.push([31*Math.cos(a),31*Math.sin(a)])}return p}
+function build(){
+ const{Sx,Sy,H,ts,bw,bd,cs,nTb,tsp,eLow,eHigh,colExt,sbs,br}=P,c=40,dr=P.nSt<=7?25:42,cbd=20,bbd=20,e=100,hl=bd*.38,dz=80;
+ for(const k in G)clear(G[k]);
+ M.conc.opacity=P.opB;M.slab.opacity=P.opS;M.slab.depthWrite=P.opS>=1;M.col.opacity=P.opC;M.duct.opacity=P.opD;M.ftg.opacity=P.opC;M.ftg.depthWrite=P.opC>=1;M.conc.depthWrite=P.opB>=1;M.col.depthWrite=P.opC>=1;
+ const E=Math.max(cs,bw)/2,eb=bw>cs?E-c-P.stD-bbd/2:e,Lx=2*Sx+2*E,Ly=2*Sy+2*E,xs=[-Sx,0,Sx],zs=[-Sy,0,Sy],lv=[H,2*H],kc=cs/2-c-P.ctD-cbd/2,u=[-kc,-kc/3,kc/3,kc],mb=bw/2-c-P.stD-bbd/2-10,bz=Array.from({length:P.nBm},(_,i)=>P.nBm>1?-mb+2*mb*i/(P.nBm-1):0),bt=bd/2-c-P.stD-bbd/2;
+ // stirrup legs = main bars: outer hoop (2 legs) + inner hoops each wrapping a pair of bars + a single tie if one bar is left over
+ const sdl=P.stD,oo=(bbd+sdl)/2,hwl=bw/2-c-sdl/2,hoops=[[0,hwl,Math.min(sdl/2+bbd/2+10,hwl-1)]],ties=[],legs=[-hwl,hwl];
+ {const n=bz.length;let i=1;for(;i+1<n-1;i+=2){hoops.push([(bz[i]+bz[i+1])/2,(bz[i+1]-bz[i])/2+oo,oo]);legs.push(bz[i]-oo,bz[i+1]+oo)}if(i===n-2){ties.push(bz[i]+oo);legs.push(bz[i]+oo)}}
+ const FX=[],FZ=[];for(const x of xs)for(const a of u)FX.push(x+a);for(const z of zs)for(const b of u)FZ.push(z+b);
+ const nud=(v,F,cl)=>{for(let i=0;i<100&&F.some(f=>Math.abs(v-f)<cl);i++)v+=5;return v};
+ const SP=stp(P.nSt),as=dr/25,aB=[anc(as,1),anc(as,0)],aS=[anc(.45,1),anc(.45,0)];
+ // columns + column bars (4 per face) from base up through both storeys, extending above the roof
+ const FS=P.ftS,FT=P.ftT,fOn=FS>=cs+100,rb=60,yh=-FT+92,yb0=fOn?yh+rb:c,cg=new THREE.CylinderGeometry(cbd/2,cbd/2,2*H+colExt-yb0,12),bg={},
+  tg=(pts,n,r)=>new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),n,r,6);
+ if(fOn){ // pad footings: bottom mat Ø16 @150 both ways, bar ends bent up (hooks) at the footing edge
+  const n=Math.floor((FS-200)/150)+1,sp=(FS-200)/Math.max(n-1,1),hk=Math.min(350,FT-150),yx=-FT+58,yz=-FT+74,bx=bent(-(FS/2-58),FS/2-58,0,1,hk,40),
+   gx=tg(bx.map(([s,y])=>V3(s,yx+y,0)),130,8),gz=tg(bx.map(([s,y])=>V3(0,yz+y,s)),130,8);
+  for(const x of xs)for(const z of zs){box(G.ftg,FS,FT,FS,x,-FT/2,z,M.ftg);
+   for(let i=0;i<n;i++){const o=-(FS-200)/2+i*sp;let m=new THREE.Mesh(gx,M.fbar);m.position.set(x,0,z+o);G.fbar.add(m);m=new THREE.Mesh(gz,M.fbar);m.position.set(x+o,0,z);G.fbar.add(m)}}}
+ // column bar base: 90° bend outward (face bars straight out, corner bars diagonal) lying on the footing mat
+ const cbend=(a,b)=>{const k=a+","+b;if(bg[k])return bg[k];let dx=Math.abs(a)===kc?Math.sign(a):0,dz=Math.abs(b)===kc?Math.sign(b):0;const nn=Math.hypot(dx,dz)||1;dx/=nn;dz/=nn;
+  const Lh=Math.max(20,Math.min(500,(FS/2-120-Math.max(Math.abs(a),Math.abs(b))-rb)/Math.max(Math.abs(dx),Math.abs(dz)))),p=[];
+  for(let j=0;j<=8;j++){const q=Math.PI+Math.PI/2*j/8,t=rb+rb*Math.cos(q);p.push(V3(a+dx*t,yh+rb+rb*Math.sin(q),b+dz*t))}
+  for(const f of[.5,1])p.push(V3(a+dx*(rb+Lh*f),yh,b+dz*(rb+Lh*f)));
+  return bg[k]=tg(p,60,cbd/2)};
+ for(const x of xs)for(const z of zs){
+  for(const[y0,y1]of[[0,H],[H,2*H]])box(G.col,cs,y1-y0,cs,x,(y0+y1)/2,z,M.col);
+  for(const a of u)for(const b of u)if(Math.abs(a)===kc||Math.abs(b)===kc){const m=new THREE.Mesh(cg,M.cbar);m.position.set(x+a,yb0+(2*H+colExt-yb0)/2,z+b);G.cbar.add(m);if(fOn){const q=new THREE.Mesh(cbend(a,b),M.cbar);q.position.set(x,0,z);G.cbar.add(q)}}}
+ const pitch=nTb>1?Math.min(Math.max(120,bw/10),(bw-2*c-70)/(nTb-1)):0,tz=Array.from({length:nTb},(_,i)=>(i-(nTb-1)/2)*pitch);
+ const gx=new THREE.CylinderGeometry(5,5,Lx-60,6),gz=new THREE.CylinderGeometry(5,5,Ly-60,6);gx.rotateZ(Math.PI/2);gz.rotateX(Math.PI/2);
+ // slab is monolithic with the beams: slab bars/tendons pass through beam depth, so keep them clear of stirrup legs/planes (and PT ducts for bars)
+ const hw0=bw/2-c-P.stD/2,zt0=bz[1]+(bbd+P.stD)/2,bzS=[],bxS=[],bzP=[],bxP=[];
+ for(const i of[0,1]){for(const z of stPos(zs[i]+E,zs[i+1]-E))bzS.push(z);for(const x of stPos(xs[i]+E,xs[i+1]-E))bxS.push(x)}
+ for(const k of[0,1,2]){for(const l of legs){bzS.push(zs[k]+l);bxS.push(xs[k]+l)}for(const t of tz)for(const d of[-15,15]){bzP.push(zs[k]+t+d);bxP.push(xs[k]+t+d)}}
+ const FZs=FZ.concat(bzS),FXs=FX.concat(bxS),FZb=FZs.concat(bzP),FXb=FXs.concat(bxP);
+ for(const Y of lv){const yc=Y-bd/2;
+  box(G.slab,Lx,ts,Ly,0,Y-ts/2,0,M.slab);
+  // beams: PT tendons (stressed from both ends), bent top/bottom bars; Z-direction tendons are held 80 mm lower so they pass under X tendons at joints
+  for(let i=0;i<3;i++){const pz=zs[i],px=xs[i];box(G.beam,Lx,bd,bw,0,yc,pz,M.conc);box(G.beam,bw,bd,Ly,px,yc,0,M.conc);
+   for(const dir of[0,1]){const L=dir?Ly:Lx,Sp=dir?Sy:Sx,hi=dir?eHigh-dz:eHigh,p=dir?px:pz;
+    for(const o of tz){const pts=[];for(let i=0;i<=60;i++){const s=-L/2+L*i/60;pts.push(dir?V3(p+o,yc+prof(s,Sp,eLow,hi),s):V3(s,yc+prof(s,Sp,eLow,hi),p+o))}
+     tube(G.duct,pts,dr,M.duct);for(const[dl,dy]of SP)G.strand.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(v=>dir?V3(v.x+dl,v.y+dy,v.z):V3(v.x,v.y+dy,v.z+dl))),90,7.6,5),M.str));anchor(G.duct,aB,pts,dir,1,1)}
+    for(const sg of[1,-1])for(const b of bz){const pts=bent(-Sp-eb,Sp+eb,sg*bt,-sg,hl,br).map(([s,y])=>dir?V3(p+b,yc+y,s):V3(s,yc+y,p+b));tube(G.bbar,pts,bbd/2,M.bar)}}}
+  // slab tendons: X layer above Y layer, stressing end alternates side by side tendon; positions moved clear of column bars
+  for(const dir of[0,1]){const L=dir?Ly:Lx,Wd=dir?Lx:Ly,Sp=dir?Sy:Sx,n=Math.max(2,Math.floor(Wd/tsp)),yo=Y-ts/2-(dir?25:0);
+   for(let k=0;k<n;k++){const o=nud(-Wd/2+(k+.5)*Wd/n,dir?FXs:FZs,18),pts=[];
+    for(let i=0;i<=60;i++){const s=-L/2+L*i/60,y=yo+prof(s,Sp,10,10);pts.push(dir?V3(o,y,s):V3(s,y,o))}
+    tube(G.duct,pts,8,M.sduct);anchor(G.duct,aS,pts,dir,k%2?0:1,k%2?1:0)}}
+  // slab mesh Ø10: bottom (Y-ts+30/40) and top (Y-40/30), nudged clear of column bars
+  // slab bars: bottom = full span; top = full span only if slab >= 300 thick, otherwise only near supports (real-site practice)
+  const sg=(S,Lh,full)=>{if(full)return[[-Lh+30,Lh-30]];const q=S*P.stx;return[[-Lh+30,-S+q],[-q,q],[S-q,Lh-30]]},
+   cyl=(a,b,ax)=>{const g=new THREE.CylinderGeometry(5,5,b-a,6);ax?g.rotateX(Math.PI/2):g.rotateZ(Math.PI/2);return[g,(a+b)/2]};
+  for(const[yx,yz,top]of[[Y-ts+30,Y-ts+40,0],[Y-34,Y-24,1]]){
+   const fl=!top||ts>=300,mt=top?M.stop:M.sbot,cx=sg(Sx,Lx/2,fl).map(([a,b])=>cyl(a,b,0)),cz=sg(Sy,Ly/2,fl).map(([a,b])=>cyl(a,b,1));
+   for(let z=-Ly/2+30;z<=Ly/2-30;z+=sbs){const zz=nud(z,top?FZ:FZb,15);for(const[g,xc]of cx){const m=new THREE.Mesh(g,mt);m.position.set(xc,yx,zz);(top?G.stp:G.sbt).add(m)}}
+   for(let x=-Lx/2+30;x<=Lx/2-30;x+=sbs){const xx=nud(x,top?FX:FXb,15);for(const[g,zc]of cz){const m=new THREE.Mesh(g,mt);m.position.set(xx,yz,zc);(top?G.stp:G.sbt).add(m)}}}
+ }
+ // stirrups (beams) & ties (columns)
+ let stInfo="";
+ {const sd=P.stD,ct=P.ctD,csp=P.ctSp,hw=bw/2-c-sd/2,hh=bd/2-c-sd/2,rz=Math.min(sd/2+bbd/2+10,hw-1,hh-1),hr=cs/2-c-ct/2,rr=(cbd+ct)/2,fr=ct/2+3,zt=bz[1]+(bbd+sd)/2,
+  gXs=hoops.map(([zc,hu,r])=>loopG(hu,hh,r,sd,(a,b)=>V3(0,b,a+zc),96)),gZs=hoops.map(([zc,hu,r])=>loopG(hu,hh,r,sd,(a,b)=>V3(a+zc,b,0),96)),gC=loopG(hr,hr,rr,ct,(a,b)=>V3(a,0,b),160),
+  tXs=ties.map(z=>new THREE.CylinderGeometry(sd/2,sd/2,2*hh,6).translate(0,0,z)),tZs=ties.map(z=>new THREE.CylinderGeometry(sd/2,sd/2,2*hh,6).translate(z,0,0)),
+  pos=(a,b)=>{const m=(a+b)/2,o=[];for(let x=a+50;x<=m;x+=x-a<P.stZn?P.stSe:P.stSp)o.push(x);if(!o.length)return o;const q=o[o.length-1];return o.concat(o.map(x=>a+b-x).reverse().filter(x=>x-q>.6*P.stSe))},
+  ins=(g,m,pp,gr=G.stir)=>{if(!pp.length)return;const I=new THREE.InstancedMesh(g,m,pp.length),mx=new THREE.Matrix4();pp.forEach((q,i)=>{mx.makeTranslation(q[0],q[1],q[2]);I.setMatrixAt(i,mx)});I.frustumCulled=false;gr.add(I)},pX=[],pZ=[];
+  for(const Y of lv){const yc=Y-bd/2;
+   for(const p of zs)for(let i=0;i<2;i++)for(const x of pos(xs[i]+E,xs[i+1]-E))pX.push([x,yc,p]);
+   for(const p of xs)for(let i=0;i<2;i++)for(const z of pos(zs[i]+E,zs[i+1]-E))pZ.push([p,yc,z])}
+  gXs.forEach(g=>ins(g,M.stir,pX));tXs.forEach(g=>ins(g,M.stir,pX));gZs.forEach(g=>ins(g,M.stir,pZ));tZs.forEach(g=>ins(g,M.stir,pZ));
+  // column ties: regular in free column; in the beam/slab zone only in clear windows (between beam bars, tendons, slab steel)
+  const ys=[],soff=Y=>Y-bd,dn=(t,b)=>{for(let y=t-50;y>=b+30;y-=csp)ys.push(y)},
+  jt=(Y,last)=>{const f=[],A=Y-bd/2,add=(y,h)=>f.push([y-h,y+h]);
+   for(const sg of[1,-1])add(A+sg*bt,bbd/2+fr);
+   for(const cx of xs)for(const cz of zs)for(const q of[1,-1]){add(A+prof(cx+q*hr,Sx,eLow,eHigh),dr+fr);add(A+prof(cz+q*hr,Sy,eLow,eHigh-dz),dr+fr)}
+   for(const y of[Y-ts+30,Y-ts+40,Y-34,Y-24])add(y,5+fr);for(const y of[Y-ts/2,Y-ts/2-25])add(y,18+fr);
+   for(let y=soff(Y)+30;y<=Y-30;y+=5)if(y-last>=csp&&!f.some(([a,b])=>y>a&&y<b)){ys.push(y);last=y}};
+  dn(soff(lv[0]),P.ftS>=cs+100?-(P.ftT-180):0);jt(lv[0],soff(lv[0])-50);dn(soff(lv[1]),lv[0]);jt(lv[1],soff(lv[1])-50);
+  for(let y=lv[1]+50;y<=lv[1]+colExt-30;y+=csp)ys.push(y);
+  const pc=[];for(const cx of xs)for(const cz of zs)for(const y of ys)pc.push([cx,y,cz]);ins(gC,M.tie,pc,G.ctie);
+  const sr=ys.filter(y=>y<lv[1]).sort((a,b)=>a-b);let gap=0;for(let i=1;i<sr.length;i++)gap=Math.max(gap,sr[i]-sr[i-1]);
+  stInfo=`${pX.length+pZ.length} beam stirrup sets, ${ys.length} ties per column (largest gap ${Math.round(gap)} mm${gap>2*csp?" – check":""}); ties inside the beam/slab zone sit only in clear windows between beam bars, tendons and slab steel.`}
+ // clash checks
+ const w=[],ck=(a,b,cl)=>Math.abs(a-b)<cl,tHi=[eHigh,eHigh-dz];
+ tz.forEach((z,i)=>{const n=i+1;
+  if(u.some(a=>ck(z,a,dr+cbd/2)))w.push(`beam tendon ${n} vs column bars`);
+  for(const h of tHi)if(bz.some(b=>Math.hypot(Math.max(bt-hl-h,0,h-bt),b-z)<dr+bbd/2))w.push(`beam tendon ${n} vs top-bar hook`);
+  if(bz.some(b=>ck(b,z,dr+bbd/2))&&(eHigh+dr>bt-bbd/2||eLow+dr>bt-bbd/2))w.push(`beam tendon ${n} vs beam bars`)});
+ if(bz.some(b=>u.some(a=>ck(a,b,bbd/2+cbd/2))))w.push("beam bars vs column bars");
+ for(const px of xs)for(const pz of zs)for(const o of tz)for(const o2 of tz)if(Math.abs(prof(px+o2,Sx,eLow,eHigh)-prof(pz+o,Sy,eLow,eHigh-dz))<2*dr+5)w.push("X-beam tendon crosses Z-beam tendon at joint");
+ {const sd=P.stD,hw=bw/2-c-sd/2,hh=bd/2-c-sd/2,lg=legs;if(P.nBm>1&&2*mb/(P.nBm-1)<bbd+25)w.push('beam bars too close – widen the beam or reduce the bar count');
+  tz.forEach((z,i)=>{const n=i+1;if(lg.some(l=>ck(z,l,dr+sd/2)))w.push(`beam tendon ${n} vs stirrup leg`);if(Math.max(eHigh,eLow)+dr>hh-sd/2)w.push(`beam tendon ${n} vs stirrup top/bottom`)})}
+ for(const h of tHi)for(const off of[0,25])if(Math.abs(h-bd/2+ts/2+off-10)<dr+8)w.push("beam tendon high point vs slab tendon layer");
+ if(nTb>1&&pitch<2*dr+4)w.push('beam tendon ducts overlap – widen the beam or reduce tendons/strands');
+ const ws=[...new Set(w)];
+ document.getElementById("info").innerHTML=`<b>2 storeys × ${H} mm</b> · 3 × 3 columns ${cs}×${cs} · bays ${Sx} × ${Sy} · slab ${ts} · beams ${bw}×${bd} · ${nTb} tendon(s)/beam each way × ${P.nSt} strand(s) Ø15.2 in Ø${2*dr} duct (stressed both ends) · slab tendons @ ${tsp} both ways (stressing end alternates) · slab bars Ø10 @ ${sbs}: bottom full span, top ${ts>=300?'full span':'near supports only ('+P.stx+' × span each side)'} · bent beam bars (R${br}, hook ${Math.round(hl)}) · column bars 12Ø${cbd} +${colExt} above roof · beam stirrups ${legs.length}-leg Ø${P.stD} @ ${P.stSp} (${P.stSe} within ${P.stZn} of columns) · column ties Ø${P.ctD} @ ${P.ctSp} · footings ${P.ftS>=cs+100?P.ftS+'×'+P.ftT:'none'}<br>`+
+ (ws.length?`<span class="bad">⚠ CLASH: ${ws.join("; ")}</span>`:`<span class="ok">✓ No clash: beam tendons / slab tendons vs column bars, beam bars &amp; hooks, slab mesh, crossing tendons, stirrups and column ties.</span>`)+
+ `<br><span class="w">Blue plates = anchorages: white head + red wedges + strand tail = stressing end; bulb = dead end. Slab top is flush with beam top (monolithic); slab steel passes through the beam depth and is shifted clear of stirrup legs. Visualization only – not a structural design. Green = beam stirrups (hoop + cross-tie), purple = column ties. ${stInfo}</span>`;
+ G.col.visible=!!V.col;G.beam.visible=!!V.beam;G.slab.visible=!!V.slab;G.duct.visible=!!V.duct;G.stir.visible=!!V.stir;G.strand.visible=!!V.strand;G.ftg.visible=!!V.ftg;G.fbar.visible=!!V.fbar;G.bbar.visible=!!V.bbar;G.cbar.visible=!!V.cbar;G.stp.visible=!!V.stp;G.sbt.visible=!!V.sbt;G.ctie.visible=!!V.ctie;grid.visible=!!V.grid;
+}
+let pend=0;const sched=()=>{if(!pend)pend=requestAnimationFrame(()=>{pend=0;build()})};
+const l=document.getElementById("l"),r=document.getElementById("r");
+for(const s of S){if(s[0]==="h"){l.insertAdjacentHTML("beforeend",`<h3>${s[1]}</h3>`);continue}
+ const[k,t,mn,mx,st]=s,e=document.createElement("label");e.className="row";e.innerHTML=`<span>${t}</span><o></o><input type="range" min="${mn}" max="${mx}" step="${st}">`;
+ const i=e.querySelector("input"),o=e.querySelector("o"),sy=()=>{i.value=P[k];o.textContent=P[k]};i.oninput=()=>{P[k]=+i.value;sy();sched()};sy();l.append(e)}
+r.insertAdjacentHTML("beforeend","<h3>Show</h3>");
+for(const k in V){const e=document.createElement("label");e.className="chk";e.innerHTML=`<input type="checkbox" checked><span>${VL[k]}</span>`;e.firstChild.onchange=ev=>{V[k]=ev.target.checked;sched()};r.append(e)}
+r.insertAdjacentHTML("beforeend","<h3>Colours</h3>");
+for(const[k,t]of[["bar","Beam bars"],["stir","Beam stirrups"],["cbar","Column bars"],["tie","Column ties"],["stop","Slab top bars"],["sbot","Slab bottom bars"],["fbar","Footing bars"],["duct","Tendon ducts"],["str","Strands"]]){const e=document.createElement("label");e.className="chk";e.innerHTML=`<input type="color" value="#${M[k].color.getHexString()}"><span>${t}</span>`;e.firstChild.oninput=ev=>{M[k].color.set(ev.target.value);if(k==="duct")M.sduct.color.set(ev.target.value)};r.append(e)}
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener("resize",resize);
+cam.position.set(19000,13000,23000);ctl.target.set(0,3500,0);ctl.update();resize();build();
+(function loop(){requestAnimationFrame(loop);ctl.update();R.render(scene,cam)})();
+</script><a href="index.html" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:99;background:#ff8c1a;color:#0a1022;font:600 12px system-ui,sans-serif;padding:6px 12px;border-radius:999px;text-decoration:none">⌂ All tools</a></body></html>
