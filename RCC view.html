@@ -1,0 +1,248 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>RCC Building & Reinforcement Explorer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{color-scheme:dark;--bg:#0e1626;--p:#16213a;--p2:#1c2a47;--ln:#2b3c60;--tx:#dce6f7;--mu:#8fa3c4;--ac:#3b8cff;--or:#ff9f1c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font:12px/1.4 system-ui,Segoe UI,Arial,sans-serif;overflow:hidden}
+#app{height:100%;display:grid;grid-template:46px 1fr 118px/224px 1fr 310px}
+header{grid-column:1/4;background:var(--p);border-bottom:1px solid var(--ln);display:flex;gap:6px;align-items:center;padding:0 8px;overflow-x:auto;white-space:nowrap}
+header b{color:var(--or);margin-right:8px;font-size:13px}
+button,select,input{background:var(--p2);color:var(--tx);border:1px solid var(--ln);border-radius:4px;padding:4px 8px;font:inherit}
+button{cursor:pointer}button:hover,button.on{background:var(--ac);border-color:var(--ac)}
+aside{background:var(--p);overflow:auto;padding:8px}#L{border-right:1px solid var(--ln)}#R{border-left:1px solid var(--ln)}
+h4{margin:10px 0 4px;color:var(--or);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+#vp{position:relative;min-width:0}#vp canvas{display:block}
+footer{grid-column:1/4;background:var(--p);border-top:1px solid var(--ln);padding:6px 10px;display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow:auto}
+label.c{display:flex;gap:6px;align-items:center;margin:2px 0}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:middle}
+table{border-collapse:collapse;width:100%}td{padding:2px 4px;border-bottom:1px solid var(--ln);vertical-align:top}td:first-child{color:var(--mu)}
+#info svg{background:#0e1626;border:1px solid var(--ln);margin:4px 0;max-width:100%}
+.prm{display:grid;grid-template-columns:1fr 70px;gap:3px;align-items:center}.prm input{width:62px}
+details summary{cursor:pointer;color:var(--mu)}details button{margin:1px;padding:1px 5px;font-size:11px}
+#seq{position:absolute;left:8px;right:8px;bottom:8px;display:none;background:#16213acc;border:1px solid var(--ln);padding:6px;border-radius:6px;gap:6px;align-items:center}
+#sec{position:absolute;top:8px;left:8px;background:#16213acc;border:1px solid var(--ln);padding:6px;border-radius:6px;display:none;gap:6px;align-items:center}
+#modal{position:fixed;inset:0;background:#000b;display:none;z-index:9;padding:20px;overflow:auto}
+#modal>div{background:var(--p);border:1px solid var(--ln);border-radius:8px;max-width:900px;margin:0 auto;padding:14px}
+#modal svg{background:#0e1626;border:1px solid var(--ln);margin:4px;max-width:100%}
+.warn{color:var(--or);font-size:11px;margin-top:6px}
+@media(max-width:800px){html,body{overflow:auto}#app{display:flex;flex-direction:column;height:auto;min-height:100%;overflow:visible}header{order:-2;flex:none;min-height:46px;position:sticky;top:0;z-index:5}#vp{order:-1;flex:none;height:62vh;min-height:320px;width:100%}aside{overflow:visible;flex:none}#L,#R{border:0;border-top:1px solid var(--ln)}footer{display:block}}
+:root[data-theme=light]{color-scheme:light;--bg:#eef2f8;--p:#ffffff;--p2:#e4eaf4;--ln:#c5d0e2;--tx:#17233b;--mu:#4d5f80;--ac:#2563eb;--or:#c2410c}
+[data-theme=light] button:hover,[data-theme=light] button.on{color:#fff}[data-theme=light] #seq,[data-theme=light] #sec{background:#ffffffe6}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head><body>
+<div id="app">
+<header><b>RCC Explorer · G+1 Framed Building</b>
+<button data-v="iso">Isometric</button><button data-v="front">Front</button><button data-v="side">Side</button><button data-v="top">Top</button><button id="bReset">Reset</button>
+<span style="color:var(--ln)">|</span><button id="bExp">Exploded</button>
+<select id="sMode"><option value="solid">Concrete: solid</option><option value="ghost">Concrete: transparent</option><option value="hidden">Concrete: hidden</option></select>
+<button id="bSec">Section</button><button id="bSeq">Construction</button><button id="bTheme">☀ Light</button><button id="bHelp">Help</button></header>
+<aside id="L"><h4>Visibility</h4><div id="tg"></div><h4>Legend</h4><div id="lg"></div><h4>Colours</h4><div id="cc"></div><h4>Model hierarchy</h4><div id="hier"></div></aside>
+<main id="vp"><div id="sec"><select id="secAx"><option value="x">X section</option><option value="z">Y (plan) section</option><option value="y">Horizontal</option></select><input id="secPos" type="range" min="0" max="1000" value="500"></div>
+<div id="seq"><button id="qP">◀ Prev</button><button id="qPlay">▶ Play</button><button id="qN">Next ▶</button><span id="qT"></span></div></main>
+<aside id="R"><div id="info"><p style="color:var(--mu)">Click any footing, column, beam or slab in the 3D view to inspect it.</p></div>
+<h4>Parameter editor (mm)</h4><div class="prm" id="prm"></div><div style="margin-top:6px"><button id="bApply">Apply &amp; regenerate</button> <button id="bDef">Defaults</button></div><div id="err" class="warn"></div>
+<div class="warn">Illustrative educational defaults only – NOT a construction-approved design. Consult a licensed structural engineer (IS 456 / IS 13920 / SP 34).</div></aside>
+<footer><div><h4 style="margin-top:0">Learning</h4><select id="topic"></select><p id="topicTx"></p></div><div><h4 style="margin-top:0">Selection / coordinates</h4><div id="sel">No selection.</div></div></footer>
+</div>
+<div id="modal"><div id="mc"></div></div>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const $=id=>document.getElementById(id), M=v=>v/1000;
+const DEF={nx:4,ny:3,bx:3000,by:3000,h:3000,cw:300,cd:450,bw:300,bd:500,t:150,fl:1800,fd:450,cdia:16,bn:3,bdia:20,sdia:8,ss:150,cov:40};
+const LBL={nx:'Bays X',ny:'Bays Y',bx:'Grid X',by:'Grid Y',h:'Storey height',cw:'Col width',cd:'Col depth',bw:'Beam width',bd:'Beam depth',t:'Slab thickness',fl:'Footing size',fd:'Footing depth',cdia:'Column bar Ø',bn:'Beam bottom bars',bdia:'Beam bottom Ø',sdia:'Stirrup/tie Ø',ss:'Stirrup spacing',cov:'Clear cover'};
+let P={...DEF};
+const COL={conc:0xbfc7d0,bot:0x2f7bff,top:0xff3b3b,stir:0xffd23f,slabM:0x2ecc71,slabD:0xff9f1c,slabT:0xff3b3b,foot:0x9b59b6,col:0x2f7bff};
+const S={conc:1,main:1,stir:1,col:1,slab:1,ftg:1,dims:1,grid:1,labels:0,mode:'solid',seq:0,iso:null,exp:0};
+// ---------- renderer / scene
+const vp=$('vp'),renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.localClippingEnabled=true;vp.appendChild(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0e1626);
+const cam=new THREE.PerspectiveCamera(45,1,.1,300),ctl=new OrbitControls(cam,renderer.domElement);ctl.enableDamping=true;
+scene.add(new THREE.HemisphereLight(0xdde8ff,0x223,1.1));const dl=new THREE.DirectionalLight(0xffffff,1.3);dl.position.set(15,25,12);scene.add(dl);
+const clip=[],plane=new THREE.Plane(),root=new THREE.Group(),dimG=new THREE.Group(),gridG=new THREE.Group();scene.add(root,dimG,gridG);
+const cyl=new THREE.CylinderGeometry(1,1,1,8);cyl.userData.shared=1;
+const mats={};for(const k in COL)if(k!=='conc')mats[k]=new THREE.MeshStandardMaterial({color:COL[k],metalness:.4,roughness:.45,clippingPlanes:clip});
+const concMat=new THREE.MeshStandardMaterial({color:COL.conc,roughness:.9,side:THREE.DoubleSide,clippingPlanes:clip});
+const hlMat=new THREE.MeshStandardMaterial({color:0xffb347,emissive:0x7a3b00,roughness:.8,side:THREE.DoubleSide,transparent:true,opacity:.85,clippingPlanes:clip});
+const edgeMat=new THREE.LineBasicMaterial({color:0x6b7a90,clippingPlanes:clip}),dimMat=new THREE.MeshBasicMaterial({color:0xffc857});
+const pitMat=new THREE.MeshStandardMaterial({color:0x6b4a2b});
+let members=[],sel=null,boxH=null,pit=null,H=3,L=12,W=9;
+const V=(a)=>new THREE.Vector3(...a),Y=new THREE.Vector3(0,1,0),dum=new THREE.Object3D();
+// ---------- helpers
+function Member(kind,id,x,y,z,d){const g=new THREE.Group();g.position.set(x,y,z);const m={kind,id,g,d,conc:new THREE.Group(),parts:[],s:{},base:g.position.clone(),lv:0,f:0};g.add(m.conc);g.userData.m=m;members.push(m);root.add(g);return m}
+function box(m,w,h,d,x,y,z){const ge=new THREE.BoxGeometry(w,h,d),me=new THREE.Mesh(ge,concMat);me.position.set(x,y,z);me.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),edgeMat));m.conc.add(me)}
+function poly(m,t,pts,d){for(let i=0;i<pts.length-1;i++)(m.s[t]??=[]).push([pts[i],pts[i+1],d/2000])}
+function loop(m,t,c,u,v,hu,hv,d){const k=(a,b)=>[c[0]+u[0]*a+v[0]*b,c[1]+u[1]*a+v[1]*b,c[2]+u[2]*a+v[2]*b],hk=Math.max(.075,.006*d)/Math.SQRT2;
+ poly(m,t,[k(-hu,-hv),k(hu,-hv),k(hu,hv),k(-hu,hv),k(-hu,-hv),k(-hu+hk,-hv+hk)],d)}  // closed loop + 135° hook
+function finish(m){for(const t in m.s){const a=m.s[t],im=new THREE.InstancedMesh(cyl,mats[t],a.length);let n=0;
+ a.forEach(([p,q,r])=>{const A=V(p),B=V(q),dir=B.clone().sub(A),len=dir.length();if(len<1e-6)return;dum.position.copy(A).add(B).multiplyScalar(.5);dum.quaternion.setFromUnitVectors(Y,dir.normalize());dum.scale.set(r,len,r);dum.updateMatrix();im.setMatrixAt(n++,dum.matrix)});
+ im.count=n;im.userData.t=t;im.frustumCulled=false;m.g.add(im);m.parts.push(im)}
+ if(m.label){const c=document.createElement('canvas');c.width=128;c.height=40;const x=c.getContext('2d');x.fillStyle='#0e1626cc';x.fillRect(0,0,128,40);x.fillStyle='#ffd23f';x.font='bold 24px sans-serif';x.textAlign='center';x.fillText(m.id,64,29);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));sp.scale.set(.7,.22,1);sp.position.set(...m.label);m.g.add(sp);m.sp=sp}}
+const pos1=(len,st,zone,sc,sm)=>{const a=[];let u=st;while(u<=len-st+1e-9){a.push(u);u+=(u<zone||u>len-zone)?sc:sm}return a};
+function colPts(){const c=M(P.cov),s=M(P.sdia),d=M(P.cdia),a=M(P.cw)/2-c-s-d/2,b=M(P.cd)/2-c-s-d/2;return[[-a,-b],[a,-b],[-a,b],[a,b],[-a,0],[a,0],[0,-b],[0,b]]}
+const PILL={dim:{bg:'#10192ce6',fg:'#ffd27a',bd:'#ffc857'},note:{bg:'#0b3b4fe6',fg:'#8be9ff',bd:'#35c4e8'}};let noteG,DC='#ffc857',FG='#fff';
+function recolorDims(){dimG.traverse(o=>{if(o.material&&o.material.color&&!o.isSprite)o.material.color.set(DC)})}
+function text(str,sz=1,st){const c=document.createElement('canvas');c.width=512;c.height=64;const x=c.getContext('2d');let f=34;x.font=`bold ${f}px sans-serif`;while(x.measureText(str).width>470&&f>10){f--;x.font=`bold ${f}px sans-serif`}x.textAlign='center';
+ if(st){const w=x.measureText(str).width+26;x.fillStyle=st.bg;x.strokeStyle=st.bd;x.lineWidth=3;x.beginPath();x.roundRect(256-w/2,6,w,52,14);x.fill();x.stroke();x.fillStyle=st.fg}else x.fillStyle=FG;x.fillText(str,256,43);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));sp.scale.set(4.8*sz,.6*sz,1);return sp}
+function dim(a,b,txt,off){const A=V(a),B=V(b),o=V(off),A2=A.clone().add(o),B2=B.clone().add(o),mid=A2.clone().add(B2).multiplyScalar(.5),dir=B2.clone().sub(A2).normalize(),h=A2.distanceTo(B2)/2;
+ dimG.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([A,A2.clone().add(o.clone().normalize().multiplyScalar(.15)),B,B2.clone().add(o.clone().normalize().multiplyScalar(.15))]),new THREE.LineBasicMaterial({color:0xffc857})));
+ const cy=new THREE.Mesh(cyl,dimMat);cy.position.copy(mid);cy.quaternion.setFromUnitVectors(Y,dir);cy.scale.set(.02,h*2,.02);dimG.add(cy,new THREE.ArrowHelper(dir,mid,h,0xffc857,.32,.16),new THREE.ArrowHelper(dir.clone().negate(),mid,h,0xffc857,.32,.16));const t=text(txt,1,PILL.dim);t.position.copy(mid).add(new THREE.Vector3(0,.35,0));dimG.add(t)}
+// ---------- build
+function disposeAll(){[root,dimG,gridG].forEach(g=>{g.traverse(o=>{if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();if(o.isSprite){o.material.map.dispose();o.material.dispose()}});g.clear()})}
+function build(){disposeAll();members=[];sel=null;if(boxH){scene.remove(boxH);boxH=null}
+ const p=P,nx=p.nx,ny=p.ny;H=M(p.h);L=nx*M(p.bx);W=ny*M(p.by);const X=i=>-L/2+i*M(p.bx),Z=j=>-W/2+j*M(p.by),c=M(p.cov),sd=M(p.sdia),cw=M(p.cw),cd=M(p.cd),ped=Math.max(.45,cw+.1,cd+.1),ftop=-.75,fbot=ftop-M(p.fd),SW=Math.min(.23,cw-.02),SD=.45;
+ // footings + pedestals
+ for(let j=0;j<=ny;j++)for(let i=0;i<=nx;i++){const m=Member('ftg','F'+(j*(nx+1)+i+1),X(i),0,Z(j),{});const fl=M(p.fl),fc=.05;
+  box(m,fl,M(p.fd),fl,0,(ftop+fbot)/2,0);box(m,ped,-ftop,ped,0,ftop/2,0);
+  const n=Math.floor((fl-2*fc)/.15)+1,sp=(fl-2*fc)/(n-1),a=fl/2-fc,y1=fbot+fc+.006,y2=y1+.012;
+  for(let k=0;k<n;k++){const o=-a+k*sp;poly(m,'foot',[[-a,y1+.1,o],[-a,y1,o],[a,y1,o],[a,y1+.1,o]],12);poly(m,'foot',[[o,y2+.1,-a],[o,y2,-a],[o,y2,a],[o,y2+.1,a]],12)}
+  const lap=.04*p.cdia,yb=y2+.014;colPts().forEach(([px,pz])=>{const dx=px?Math.sign(px):0,dz=px?0:Math.sign(pz);poly(m,'col',[[px+dx*.3,yb,pz+dz*.3],[px,yb,pz],[px,lap,pz]],p.cdia)});
+  for(let y=ftop+.05;y<-.04;y+=.15)loop(m,'stir',[0,y,0],[1,0,0],[0,0,1],ped/2-c-sd/2,ped/2-c-sd/2,p.sdia);
+  m.label=[0,fbot-.1,0];m.d={fl,ped,fd:M(p.fd),fc,n,sp,lap};finish(m)}
+ // columns
+ for(let lv=0;lv<2;lv++)for(let j=0;j<=ny;j++)for(let i=0;i<=nx;i++){const m=Member('col',`C${j*(nx+1)+i+1}${lv?'-1F':'-GF'}`,X(i),lv*H,Z(j),{});m.lv=lv;m.d={lv,h:H};
+  box(m,cw,H,cd,0,H/2,0);const lap=lv?0:.04*p.cdia;colPts().forEach(([a,b])=>poly(m,'col',[[a,0,b],[a,H-(lv?c:0)+lap,b]],p.cdia));
+  const zone=Math.max(cd,H/6,.45);pos1(H,.05,zone,M(p.ss)*2/3,M(p.ss)).forEach(y=>loop(m,'stir',[0,y,0],[1,0,0],[0,0,1],cw/2-c-sd/2,cd/2-c-sd/2,p.sdia));
+  if(!lv)m.label=[0,H/2,0];m.d.zone=zone;m.d.lap=lap;finish(m)}
+ // beams
+ let nb=0,ns=0,np=0;for(let f=0;f<=2;f++){const top=f*H;
+  const mkB=(dir,i,j)=>{const x=dir==='x'?(X(i)+X(i+1))/2:X(i),z=dir==='x'?Z(j):(Z(j)+Z(j+1))/2,main=dir==='x',pl=f===0,b=main?M(p.bw):SW,D=pl?.4:main?M(p.bd):SD,span=pl?(main?M(p.bx):M(p.by))-ped:main?M(p.bx)-cw:M(p.by)-cd,ext=(pl?ped:main?cw:cd)-c;
+   const m=Member('beam',pl?'PB'+(++np):main?'B'+(++nb):'SB'+(++ns),x,top-D/2,z,{});m.f=f;m.dir=dir;m.g.rotation.y=main?0:Math.PI/2;m.d={main,b,D,span,ext,pl};box(m,span,D,b,0,0,0);
+   const bd=M(p.bdia),td=.016,inner=b-2*(c+sd)-bd,n=p.bn,vb=-D/2+c+sd+bd/2,vt=D/2-c-sd-td/2,hk=12*bd,a=span/2+ext;
+   for(let k=0;k<n;k++){const w=n>1?-inner/2+k*inner/(n-1):0;poly(m,'bot',[[-a,vb+hk,w],[-a,vb,w],[a,vb,w],[a,vb+hk,w]],p.bdia)}
+   const it=b-2*(c+sd)-td;for(let k=0;k<3;k++){const w=-it/2+k*it/2;poly(m,'top',[[-a,vt-.19,w],[-a,vt,w],[a,vt,w],[a,vt-.19,w]],16)}
+   [-1,1].forEach(sg=>[-it/4,it/4].forEach(w=>poly(m,'top',[[sg*a,vt-td-.025,w],[sg*(span/2-.3*span),vt-td-.025,w]],16)));
+   pos1(span,.05,2*D,M(p.ss)*2/3,M(p.ss)).forEach(u=>loop(m,'stir',[u-span/2,0,0],[0,0,1],[0,1,0],b/2-c-sd/2,D/2-c-sd/2,p.sdia));
+   m.label=[0,D/2+.15,0];m.d.ld=49*bd;finish(m)};
+  for(let j=0;j<=ny;j++)for(let i=0;i<nx;i++)mkB('x',i,j);for(let i=0;i<=nx;i++)for(let j=0;j<ny;j++)mkB('z',i,j)}
+ // slabs
+ let sn=0;for(let f=0;f<=2;f++)for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const t=M(p.t),gs=f===0,px=M(p.bx)-SW,pz=M(p.by)-M(p.bw);
+  const m=Member('slab',(gs?'GS':'S')+(++sn),(X(i)+X(i+1))/2,f*H-t/2,(Z(j)+Z(j+1))/2,{});m.f=f;box(m,px,t,pz,0,0,0);
+  const sc=Math.min(c,.025),alongX=px<=pz,La=alongX?px:pz,Lb=alongX?pz:px,yM=-t/2+sc+.005,yD=yM+.009,yT=t/2-sc-.005;
+  const put=(type,dia,sp,dirX,y,l0,l1)=>{const Lw=dirX?px:pz,Lc=dirX?pz:px,n=Math.floor((Lc-2*sc)/sp)+1,s=(Lc-2*sc)/(n-1||1);for(let k=0;k<n;k++){const o=-Lc/2+sc+k*s;poly(m,type,dirX?[[l0,y,o],[l1,y,o]]:[[o,y,l0],[o,y,l1]],dia)}};
+  put('slabM',10,.15,alongX,yM,-La/2+sc,La/2-sc);put('slabD',8,.2,!alongX,yD,-Lb/2+sc,Lb/2-sc);
+  [-1,1].forEach(sg=>put('slabT',10,.3,alongX,yT,sg*(La/2+.1),sg*(La/2-.3*La)));
+  m.d={px,pz,t,alongX,La,Lb,gs,two:Math.max(px,pz)/Math.min(px,pz)<2};m.label=[0,t,0];finish(m)}
+ // excavation pit marker, grid, dims
+ pit=new THREE.Mesh(new THREE.BoxGeometry(L+3,.02,W+3),pitMat);pit.position.y=-1.2;gridG.add(pit);
+ const lm=new THREE.LineBasicMaterial({color:0x3f77d9});for(let i=0;i<=nx;i++){gridG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(X(i),.01,-W/2-1),new THREE.Vector3(X(i),.01,W/2+1)]),lm));const t=text(String.fromCharCode(65+i),.6);t.position.set(X(i),.1,-W/2-1.4);gridG.add(t)}
+ for(let j=0;j<=ny;j++){gridG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-L/2-1,.01,Z(j)),new THREE.Vector3(L/2+1,.01,Z(j))]),lm));const t=text(''+(j+1),.6);t.position.set(-L/2-1.4,.1,Z(j));gridG.add(t)}
+ dim([-L/2,0,W/2],[L/2,0,W/2],`${p.nx*p.bx} mm`,[0,0,1.6]);dim([L/2,0,-W/2],[L/2,0,W/2],`${p.ny*p.by} mm`,[1.6,0,0]);
+ dim([-L/2,0,-W/2],[-L/2+M(p.bx),0,-W/2],`${p.bx}`,[0,0,-1.5]);dim([-L/2,0,-W/2],[-L/2,0,-W/2+M(p.by)],`${p.by}`,[-1.5,0,0]);
+ dim([-L/2,0,W/2],[-L/2,H,W/2],`${p.h}`,[-1.6,0,1.2]);dim([-L/2,H,W/2],[-L/2,2*H,W/2],`${p.h}`,[-1.6,0,1.2]);
+ dim([X(0)-M(p.fl)/2,fbot,Z(0)-M(p.fl)/2],[X(0)+M(p.fl)/2,fbot,Z(0)-M(p.fl)/2],`${p.fl}`,[0,0,-.7]);
+ dim([X(0)-M(p.fl)/2,fbot,Z(0)-M(p.fl)/2],[X(0)-M(p.fl)/2,ftop,Z(0)-M(p.fl)/2],`${p.fd}`,[-.6,0,-.6]);
+ dim([X(0)-cw/2,H*.5,Z(0)-cd/2],[X(0)+cw/2,H*.5,Z(0)-cd/2],`${p.cw}`,[0,0,-.6]);
+ dim([X(0)-cw/2,H*.5,Z(0)-cd/2],[X(0)-cw/2,H*.5,Z(0)+cd/2],`${p.cd}`,[-.6,0,0]);
+ {const bx0=X(0)+M(p.bx)/2;dim([bx0,H-M(p.bd),Z(0)-M(p.bw)/2],[bx0,H,Z(0)-M(p.bw)/2],`${p.bd}`,[0,0,-.7]);dim([bx0,2*H-M(p.t),Z(0)-M(p.bw)/2],[bx0,2*H,Z(0)-M(p.bw)/2],`t=${p.t}`,[0,0,-.7]);dim([bx0-M(p.bw)/2,H*.4,Z(0)-.9],[bx0+M(p.bw)/2,H*.4,Z(0)-.9],`${p.bw}`,[0,0,0])}
+ noteG=new THREE.Group();dimG.add(noteG);const note=(s,x,y,z)=>{const n=text(s,.7,PILL.note);n.position.set(x,y,z);noteG.add(n)};
+ note(`Col: 8-Ø${p.cdia}, Ø${p.sdia}@${p.ss}, cover ${p.cov}`,X(1),H*.5,Z(0)-1.3);
+ note(`Beam: ${p.bn}-Ø${p.bdia} bot, 3-Ø16 top, Ø${p.sdia}@${p.ss}`,X(2),H-.6,Z(0)-1.3);
+ note('Slab: Ø10@150 main, Ø8@200 dist.',X(2),2*H+.5,Z(ny)+.2);
+ note('Footing: Ø12@150 both ways, cover 50',X(0),fbot-.5,Z(0)-1.6);
+ 
+ recolorDims();updateVis();buildHier();setSec();info(null)}
+// ---------- visibility
+const PG={bot:'main',top:'main',foot:'main',stir:'stir',col:'col',slabM:'slab',slabD:'slab',slabT:'slab'};
+function seqOK(m,conc){const s=S.seq;if(!s)return true;const k=m.kind;const r={ftg:[2,3],col:[5,6],beam:[7,9],slab:[8,9]}[k];return s>=(conc?r[1]:r[0])}
+function updateVis(){const g=S.mode==='ghost';concMat.transparent=g;concMat.opacity=g?.2:1;concMat.depthWrite=!g;concMat.needsUpdate=true;
+ members.forEach(m=>{const iso=S.iso;m.g.visible=!!((m.kind!=='ftg'||S.ftg)&&(!iso||iso===m));m.conc.visible=!!(!iso&&S.conc&&S.mode!=='hidden'&&seqOK(m,1));
+  m.parts.forEach(im=>{im.visible=!!((iso||S[PG[im.userData.t]])&&seqOK(m,0)&&!(S.seq&&m.kind==='ftg'&&im.userData.t==='col'&&S.seq<4))});if(m.sp)m.sp.visible=!!S.labels&&!iso});
+ dimG.visible=!!S.dims;if(noteG)noteG.visible=!!S.labels;gridG.children.forEach(o=>o.visible=!!S.grid||o===pit);pit.visible=S.seq>=1&&S.seq<=3}
+// ---------- sections / explode
+function setSec(){const on=$('sec').style.display==='flex';clip.length=0;if(!on)return;const ax=$('secAx').value,u=$('secPos').value/1000,lo={x:-L/2,y:-1.2,z:-W/2}[ax],hi={x:L/2,y:2*H,z:W/2}[ax],v=lo+u*(hi-lo);
+ plane.normal.set(ax==='x'?-1:0,ax==='y'?-1:0,ax==='z'?-1:0);plane.constant=v;clip.push(plane)}
+function offs(m){let y=0,h=0;if(m.kind==='ftg')y=-1.2;else if(m.kind==='col')y=m.lv*1.6;else if(m.kind==='beam'){y=m.f?.9+(m.f-1)*1.6:-.5;h=.3}else y=1.6*m.f;return[y,h]}
+// ---------- views
+const VW={iso:[1,.9,1.15],front:[0,.15,1],side:[1,.15,0],top:[0,1,.001]};
+function view(k){const d=Math.max(L,W)*1.7,t=new THREE.Vector3(0,H,0),v=VW[k];cam.position.copy(t).add(new THREE.Vector3(...v).normalize().multiplyScalar(d));ctl.target.copy(t);ctl.update()}
+// ---------- selection & info
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+renderer.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>4)return;const r=renderer.domElement.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mouse,cam);
+ const arr=[];root.traverseVisible(o=>{if(o.isMesh)arr.push(o)});const h=ray.intersectObjects(arr,false).find(x=>{if(!clip.length)return true;return plane.distanceToPoint(x.point)<=0});let o=h?.object;while(o&&!o.userData.m)o=o.parent;select(o?o.userData.m:null)});
+function select(m){if(sel)sel.conc.children.forEach(c=>c.material=concMat);sel=m;if(boxH){scene.remove(boxH);boxH=null}
+ if(m){m.conc.children.forEach(c=>c.material=hlMat);boxH=new THREE.Box3Helper(new THREE.Box3(),0xff9f1c);scene.add(boxH)}info(m)}
+const FN={ftg:'Footing spreads the column load over a large soil area so bearing pressure stays within the safe bearing capacity. Bottom mats resist the upward-bending moment of the soil reaction; starters tie the column to the footing.',col:'Column carries axial compression and bending from beams to the footing. Longitudinal bars add strength; closely spaced ties stop bar buckling and confine concrete, mainly near joints.',beam:'Beam collects slab load and transfers it to columns by bending and shear. Bottom bars resist sagging (midspan) tension, top bars resist hogging at supports, stirrups resist shear.',slab:'Slab carries floor load by plate bending and passes it to supporting beams. Main bars resist the bending in the short span; distribution bars control shrinkage cracking and share load.'};
+function secSVG(m,w,h,bars,tie,extra=''){const k=170/Math.max(w,h),o=26,cv=P.cov*k;let s=`<svg width="${w*k+2*o}" height="${h*k+2*o}"><rect x="${o}" y="${o}" width="${w*k}" height="${h*k}" fill="#3a4658" stroke="#9fb0c8"/>`;
+ if(tie){const q=(P.cov+P.sdia/2)*k;s+=`<rect x="${o+q}" y="${o+q}" width="${w*k-2*q}" height="${h*k-2*q}" fill="none" stroke="#ffd23f" stroke-width="${Math.max(2,P.sdia*k)}"/>`}
+ bars.forEach(([x,y,d,c])=>s+=`<circle cx="${o+x*k}" cy="${o+y*k}" r="${Math.max(2,d*k/2)}" fill="${c}"/>`);
+ return s+`<text x="${o}" y="${o+h*k+18}" fill="#fff" font-size="11">${w} mm</text><text x="${o+w*k+4}" y="${o+h*k/2}" fill="#fff" font-size="11">${h}</text><text x="${o+2}" y="${o-6}" fill="#8fa3c4" font-size="10">cover ${P.cov}</text>${extra}</svg>`}
+function sections(m){const p=P,c=p.cov,s=p.sdia,d=m.d;
+ if(m.kind==='col'){const w=p.cw,h=p.cd,a=c+s+p.cdia/2;return[secSVG(m,w,h,colPts().map(([x,z])=>[w/2+x*1000,h/2+z*1000,p.cdia,'#2f7bff']),1)]}
+ if(m.kind==='beam'){const w=d.b*1000,h=d.D*1000,n=p.bn,bd=p.bdia,inner=w-2*(c+s)-bd,vb=h-(c+s+bd/2),vt=c+s+8,it=w-2*(c+s)-16,B=[],T=[];
+  for(let k=0;k<n;k++)B.push([w/2-inner/2+(n>1?k*inner/(n-1):inner/2),vb,bd,'#2f7bff']);for(let k=0;k<3;k++)T.push([w/2-it/2+k*it/2,vt,16,'#ff3b3b']);
+  const E=[-it/4,it/4].map(x=>[w/2+x,vt+16+25,16,'#ff3b3b']);return[secSVG(m,w,h,B.concat(T),1),secSVG(m,w,h,B.concat(T,E),1)]}
+ if(m.kind==='slab'){const t=p.t,w=750,B=[],T=[];for(let k=0;k<5;k++){B.push([75+k*150,t-20-5,10,'#2ecc71']);T.push([75+k*150,20+5,10,'#ff3b3b'])}
+  return[secSVG(m,w,t,B.concat(T),0,`<rect x="26" y="${26+(t-20-14)*170/750}" width="${w*170/750}" height="3" fill="#ff9f1c"/>`)]}
+ const fl=p.fl,fd=p.fd,B=[];for(let k=0;k<12;k++)B.push([50+k*(fl-100)/11,fd-50-6,12,'#9b59b6']);return[secSVG(m,fl,fd,B,0)]}
+function elev(m){const d=m.d,W2=560;if(m.kind==='beam'){const D=d.D*1000,len=d.span*1000+2*d.ext*1000,k=W2/len,o=20;let s=`<svg width="${W2+2*o}" height="${D*k+2*o+14}"><rect x="${o+d.ext*1000*k}" y="${o}" width="${d.span*1000*k}" height="${D*k}" fill="#3a4658" stroke="#9fb0c8"/>`;
+  const yb=o+D*k-(P.cov+P.sdia+P.bdia/2)*k,yt=o+(P.cov+P.sdia+8)*k,hk=12*P.bdia*k;
+  s+=`<polyline points="${o},${yb-hk} ${o},${yb} ${o+len*k},${yb} ${o+len*k},${yb-hk}" fill="none" stroke="#2f7bff" stroke-width="3"/><polyline points="${o},${yt+.19*1000*k} ${o},${yt} ${o+len*k},${yt} ${o+len*k},${yt+190*k}" fill="none" stroke="#ff3b3b" stroke-width="3"/>`;
+  const ex=.3*d.span*1000*k+d.ext*1000*k;s+=`<line x1="${o}" x2="${o+ex}" y1="${yt+22*k*1.3+10}" y2="${yt+22*k*1.3+10}" stroke="#ff3b3b" stroke-width="3"/><line x1="${o+len*k-ex}" x2="${o+len*k}" y1="${yt+22*k*1.3+10}" y2="${yt+22*k*1.3+10}" stroke="#ff3b3b" stroke-width="3"/>`;
+  pos1(d.span,.05,2*d.D,P.ss*2/3000,P.ss/1000).forEach(u=>{const x=o+(d.ext+u)*1000*k;s+=`<line x1="${x}" x2="${x}" y1="${o+(P.cov)*k}" y2="${o+(D-P.cov)*k}" stroke="#ffd23f"/>`});
+  return s+`<text x="${o}" y="${D*k+o+14}" fill="#fff" font-size="10">Stirrups Ø${P.sdia}@${Math.round(P.ss*2/3)} (2d near supports) / @${P.ss} mid · bar hooks 12Ø · Ld≈49Ø = ${Math.round(d.ld*49/12*1000/1000*1)} mm</text></svg>`}
+ if(m.kind==='col'){const h=d.h*1000,k=240/h,o=20,w=P.cw*k*1.4;let s=`<svg width="${w+2*o+120}" height="${h*k+2*o}"><rect x="${o}" y="${o}" width="${w}" height="${h*k}" fill="#3a4658" stroke="#9fb0c8"/>`;
+  [P.cov+P.sdia+P.cdia/2,P.cw-(P.cov+P.sdia+P.cdia/2)].forEach(x=>s+=`<line x1="${o+x*k*1.4}" x2="${o+x*k*1.4}" y1="${o}" y2="${o+h*k}" stroke="#2f7bff" stroke-width="3"/>`);
+  pos1(d.h,.05,d.zone,P.ss*2/3000,P.ss/1000).forEach(y=>s+=`<line x1="${o+P.cov*k*1.4}" x2="${o+w-P.cov*k*1.4}" y1="${o+y*1000*k}" y2="${o+y*1000*k}" stroke="#ffd23f"/>`);
+  return s+`<text x="${w+o+6}" y="${o+20}" fill="#fff" font-size="10">Confinement zone</text><text x="${w+o+6}" y="${o+32}" fill="#fff" font-size="10">≥ ${Math.round(d.zone*1000)} mm: @${Math.round(P.ss*2/3)}</text><text x="${w+o+6}" y="${o+h*k/2}" fill="#fff" font-size="10">mid: @${P.ss}</text></svg>`}return''}
+function rows(m){const p=P,d=m.d;const cg='M25 / Fe500 (illustrative)';
+ if(m.kind==='col')return[['Level',d.lv?'First floor':'Ground floor'],['Section',`${p.cw} × ${p.cd} mm`],['Storey height',p.h+' mm'],['Grades',cg],['Long. bars',`8 – Ø${p.cdia}`],['Ties',`Ø${p.sdia} @ ${p.ss} (${Math.round(p.ss*2/3)} in ${Math.round(d.zone*1000)} mm end zones), 135° hooks`],['Clear cover',p.cov+' mm'],['Lap length',`≈40Ø = ${40*p.cdia} mm`]];
+ if(m.kind==='beam')return[['Type',d.pl?'Plinth beam ('+(d.main?'X':'Y')+')':d.main?'Main beam':'Secondary beam'],['Size',`${Math.round(d.b*1000)} × ${Math.round(d.D*1000)} mm`],['Clear span',Math.round(d.span*1000)+' mm'],['Grades',cg],['Bottom',`${p.bn} – Ø${p.bdia} (blue)`],['Top',`3 – Ø16 (red)`],['Extra support',`2 – Ø16 each support, 0.3L`],['Stirrups',`Ø${p.sdia} @ ${p.ss} (${Math.round(p.ss*2/3)} within 2d of support)`],['Anchorage',`into column, 90° bend 12Ø; Ld ≈ 49Ø = ${49*p.bdia} mm`],['Clear cover',p.cov+' mm']];
+ if(m.kind==='slab')return[['Panel',`${Math.round(d.px*1000)} × ${Math.round(d.pz*1000)} mm`],['Thickness',p.t+' mm'],['Action',d.two?'Two-way (ly/lx<2)':'One-way'],['Main (green)',`Ø10 @ 150 along ${d.alongX?'X':'Y'} (bottom)`],['Distribution (orange)',`Ø8 @ 200 along ${d.alongX?'Y':'X'}`],['Top (red)',`Ø10 @ 300 over supports, 0.3L`],['Cover',`${Math.min(p.cov,25)} mm`]];
+ return[['Footing',`${p.fl} × ${p.fl} × ${p.fd} mm`],['Pedestal',`${Math.round(d.ped*1000)} × ${Math.round(d.ped*1000)} mm`],['Bottom mat',`Ø12 @ 150 both ways (${d.n}+${d.n} bars)`],['Starters',`8 – Ø${p.cdia}, L-foot 300 mm, lap 40Ø`],['Pedestal ties',`Ø${p.sdia} @ 150`],['Cover',`50 mm`]]}
+function info(m){const el=$('info');if(!m){el.innerHTML='<p style="color:var(--mu)">Click any footing, column, beam or slab in the 3D view to inspect it.</p>';$('sel').textContent='No selection.';return}
+ const g=m.g.position,t={ftg:'Footing',col:'Column',beam:'Beam',slab:'Slab'}[m.kind];
+ el.innerHTML=`<h3 style="margin:0;color:var(--or)">${t} ${m.id}</h3><table>${rows(m).map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>${sections(m).join('')}<p>${FN[m.kind]}</p><button id="bDet">View reinforcement details</button> <button id="bIso">${S.iso?'Show all':'Isolate rebar'}</button>`;
+ $('bDet').onclick=()=>detail(m);$('bIso').onclick=()=>{S.iso=S.iso?null:m;updateVis();info(m)};
+ $('sel').innerHTML=`<b>${m.id}</b> — centre X ${g.x.toFixed(2)} m, Y ${g.y.toFixed(2)} m, Z ${g.z.toFixed(2)} m<br>${FN[m.kind]}`}
+function detail(m){const L2={col:['Longitudinal bars, ties, hooks, confinement zones and the beam-column joint (closest ties) shown below. Cross-section: 8 bars with ties enclosing every corner bar.'],beam:['1) 3D cage: use “Isolate rebar”. 2) Elevation. 3) Midspan section (3 bottom + 3 top). 4) Support section (extra 2 hogging bars added). Anchorage: bars extend into the column with a 90° bend (12Ø). Stirrups are closer near supports.'],slab:['Bottom main (green) with distribution (orange) laid above it; top bars (red) over supports. Bars cross at right angles and are tied at intersections.'],ftg:['Two layers of Ø12 mesh near the bottom, 50 mm cover, column starters with L-feet resting on the mat and lapping into the column.']}[m.kind][0];
+ const S2=sections(m),lab=m.kind==='beam'?['Section at midspan','Section near support']:['Cross-section'];
+ $('mc').innerHTML=`<h3 style="color:var(--or);margin-top:0">${m.id} – reinforcement details <button id="mx" style="float:right">Close</button></h3><p>${L2}</p>${elev(m)}<div style="display:flex;flex-wrap:wrap">${S2.map((s,i)=>`<div><div style="color:var(--mu)">${lab[i]||''}</div>${s}</div>`).join('')}</div><table>${rows(m).map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
+ $('modal').style.display='block';$('mx').onclick=()=>$('modal').style.display='none'}
+// ---------- UI
+const TG=[['conc','Concrete'],['main','Main reinforcement'],['stir','Stirrups / ties'],['col','Column reinforcement'],['slab','Slab reinforcement'],['ftg','Footings'],['dims','Dimensions'],['grid','Grid lines'],['labels','Labels']];
+$('tg').innerHTML=TG.map(([k,n])=>`<label class="c"><input type="checkbox" data-k="${k}" ${S[k]?'checked':''}> ${n}</label>`).join('');
+$('tg').onchange=e=>{S[e.target.dataset.k]=e.target.checked?1:0;updateVis()};
+$('lg').innerHTML=[['Concrete','#bfc7d0'],['Bottom reinforcement','#2f7bff'],['Top reinforcement','#ff3b3b'],['Stirrups / ties','#ffd23f'],['Slab main','#2ecc71'],['Slab distribution','#ff9f1c'],['Footing mesh','#9b59b6'],['Dimensions','#fff']].map(([n,c])=>`<div><span class="sw" style="background:${c}"></span>${n}</div>`).join('');
+const CC=[['conc','Concrete'],['bot','Bottom reinf.'],['top','Top reinf.'],['stir','Stirrups / ties'],['slabM','Slab main'],['slabD','Slab distribution'],['foot','Footing mesh'],['col','Column bars'],['dims','Dimensions'],['bg','Background']];
+const hex=n=>'#'+n.toString(16).padStart(6,'0'),DEFC={...Object.fromEntries(Object.keys(COL).map(k=>[k,hex(COL[k])])),dims:'#ffc857',bg:'#0e1626'},CUR={...DEFC};
+function leg(){$('lg').innerHTML=[['conc','Concrete'],['bot','Bottom reinforcement'],['top','Top reinforcement'],['stir','Stirrups / ties'],['slabM','Slab main'],['slabD','Slab distribution'],['foot','Footing mesh'],['col','Column bars'],['dims','Dimensions']].map(([k,n])=>`<div><span class="sw" style="background:${CUR[k]}"></span>${n}</div>`).join('')}
+function applyC(k,v){CUR[k]=v;if(k==='conc')concMat.color.set(v);else if(k==='dims'){DC=v;dimMat.color.set(v);recolorDims()}else if(k==='bg')scene.background.set(v);else{mats[k].color.set(v);if(k==='top'){mats.slabT.color.set(v);CUR.slabT=v}}leg()}
+$('cc').innerHTML=CC.map(([k,n])=>`<label class="c"><input type="color" data-c="${k}" id="c_${k}" value="${DEFC[k]}" style="padding:0;width:34px;height:22px"> ${n}</label>`).join('')+'<button id="bCR">Reset colours</button>';
+$('cc').oninput=e=>{if(e.target.dataset.c)applyC(e.target.dataset.c,e.target.value)};
+$('bCR').onclick=()=>CC.forEach(([k])=>{$('c_'+k).value=DEFC[k];applyC(k,DEFC[k])});leg();
+function buildHier(){const T={ftg:'Footings',col:'Columns',beam:'Beams',slab:'Slabs'};$('hier').innerHTML=Object.keys(T).map(k=>`<details><summary>${T[k]} (${members.filter(m=>m.kind===k).length})</summary>${members.filter(m=>m.kind===k).map(m=>`<button data-i="${members.indexOf(m)}">${m.id}</button>`).join('')}</details>`).join('')}
+$('hier').onclick=e=>{if(e.target.dataset.i!==undefined)select(members[+e.target.dataset.i])};
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>view(b.dataset.v));$('bReset').onclick=()=>{view('iso');S.exp=0;$('bExp').classList.remove('on');select(null)};
+$('bExp').onclick=e=>{S.exp=S.exp?0:1;e.target.classList.toggle('on',!!S.exp)};
+$('sMode').onchange=e=>{S.mode=e.target.value;updateVis()};
+$('bSec').onclick=e=>{const o=$('sec').style.display!=='flex';$('sec').style.display=o?'flex':'none';e.target.classList.toggle('on',o);setSec()};$('secAx').onchange=$('secPos').oninput=setSec;
+const QN=['Footing excavation','Footing reinforcement placement','Footing concrete','Column starter bars','Column reinforcement cage','Column concrete','Beam reinforcement placement','Slab reinforcement placement','Concrete casting (beams & slabs)','Completed two-storey RCC building'];
+let timer=null;function setQ(n){S.seq=Math.max(0,Math.min(10,n));$('qT').textContent=S.seq?`${S.seq}/10 – ${QN[S.seq-1]}`:'';updateVis()}
+function stop(){clearInterval(timer);timer=null;$('qPlay').textContent='▶ Play'}
+$('bSeq').onclick=e=>{const o=$('seq').style.display!=='flex';$('seq').style.display=o?'flex':'none';e.target.classList.toggle('on',o);stop();setQ(o?1:0)};
+$('qN').onclick=()=>{stop();setQ(S.seq+1)};$('qP').onclick=()=>{stop();setQ(S.seq-1||1)};
+$('qPlay').onclick=()=>{if(timer)return stop();$('qPlay').textContent='❚❚ Pause';if(S.seq>=10)setQ(1);timer=setInterval(()=>{if(S.seq>=10)stop();else setQ(S.seq+1)},2200)};
+const TOP=[['What is an RCC framed structure?','Concrete columns and beams form a rigid skeleton; reinforcing steel supplies tension capacity. Slabs and walls are carried by this frame.'],['Load transfer mechanism','Loads flow slab → beam → column → footing → soil. Each element must be stronger than the one it supports.'],['Slab-to-beam transfer','Slab load reaches supporting beams as line loads; short-span beams of a two-way slab carry roughly triangular loads, long-span ones trapezoidal.'],['Beam-to-column transfer','Beam end shear becomes axial load in the column; beam end moments become column bending. Bars are anchored in the joint.'],['Column-to-footing transfer','The column force passes through the pedestal into the footing; starter bars lap with column bars to carry bending and tension.'],['Function of main reinforcement','Carries tension caused by bending, placed at the tension face (bottom at midspan, top over supports).'],['Distribution reinforcement','Placed perpendicular to main bars; controls shrinkage/temperature cracks and spreads concentrated loads.'],['Why stirrups?','They resist diagonal shear tension, hold longitudinal bars in position and provide ductility; spaced closer near supports where shear is highest.'],['Why column ties?','They prevent longitudinal bars from buckling, confine core concrete and resist shear. 135° hooks keep ties closed during earthquakes.'],['Concrete cover','Concrete between bar surface and outer face protects steel from corrosion and fire and ensures bond. Typically 20–50 mm (IS 456).'],['Development length','Length of bar needed to transfer its stress into concrete through bond: Ld = 0.87·fy·Ø / (4·τbd) ≈ 49Ø for Fe500 in M25.'],['Lap length','Overlap used to splice bars; ≥ Ld in tension, kept away from maximum-moment zones, staggered where possible.'],['Beam-column joints','Region where members meet: highly stressed, needs continuous anchorage and closely spaced ties for seismic safety.'],['One-way vs two-way slabs','ly/lx ≥ 2: bends mainly in short direction (one-way). ly/lx < 2 supported on four sides: bends in both directions (two-way).'],['Bending moment & shear force','Bending moment causes curvature (tension on one face → main bars). Shear force tends to slide sections → stirrups.']];
+$('topic').innerHTML=TOP.map((t,i)=>`<option value="${i}">${i+1}. ${t[0]}</option>`).join('');$('topic').onchange=()=>$('topicTx').textContent=TOP[$('topic').value][1];$('topicTx').textContent=TOP[0][1];
+$('prm').innerHTML=Object.keys(DEF).map(k=>`<label for="p_${k}">${LBL[k]}</label><input id="p_${k}" type="number" value="${DEF[k]}">`).join('');
+function validate(v){const e=[],R=(k,a,b)=>{if(!(v[k]>=a&&v[k]<=b))e.push(`${LBL[k]} must be ${a}–${b}`)};
+ R('nx',1,6);R('ny',1,5);R('bx',2500,6000);R('by',2500,6000);R('h',2400,4500);R('cw',200,600);R('cd',200,800);R('bw',200,500);R('bd',300,800);R('t',100,250);R('fl',900,3000);R('fd',300,900);R('cdia',12,32);R('bn',2,5);R('bdia',10,32);R('sdia',6,12);R('ss',75,300);R('cov',20,75);
+ if(!e.length){if(v.bw>v.cd)e.push('Beam width must not exceed column depth');if(v.bd+100>v.h)e.push('Beam depth too large for storey height');if(v.bd<v.t+150)e.push('Beam depth must exceed slab thickness + 150');
+  if(v.fl>Math.min(v.bx,v.by)-200)e.push('Footing too large for grid');if(v.bn*v.bdia+(v.bn-1)*25>v.bw-2*(v.cov+v.sdia))e.push('Bottom bars do not fit in beam width');
+  if(v.cdia*3+2*(v.cov+v.sdia)>Math.min(v.cw,v.cd))e.push('Column bars do not fit');if(v.bx-v.cw<800||v.by-v.cd<800)e.push('Clear span too small');if(v.fd<350)e.push('Footing depth ≥ 350')}return e}
+$('bApply').onclick=()=>{const v={};for(const k in DEF)v[k]=+$('p_'+k).value;const e=validate(v);$('err').innerHTML=e.join('<br>');if(e.length)return;P=v;build();view('iso')};
+$('bDef').onclick=()=>{for(const k in DEF)$('p_'+k).value=DEF[k];$('bApply').click()};
+$('bHelp').onclick=()=>{$('mc').innerHTML='<h3 style="margin-top:0;color:var(--or)">How to use</h3><p>Open this single HTML file in a modern browser (internet needed once to load Three.js from the jsDelivr CDN). Drag = rotate, wheel = zoom, right-drag = pan, click = inspect a member. Use Concrete → transparent/hidden to see rebar; Section slider to cut the model; Construction to animate the build sequence; edit parameters on the right and press Apply.</p><p class="warn">Illustrative educational defaults, not construction-approved designs.</p><button onclick="document.getElementById(\'modal\').style.display=\'none\'">Close</button>';$('modal').style.display='block'};
+function theme(l){document.documentElement.dataset.theme=l?'light':'dark';FG=l?'#1b2437':'#fff';const bg=l?'#eef2f8':'#0e1626',dm=l?'#b45309':'#ffc857';DEFC.bg=bg;DEFC.dims=dm;$('c_bg').value=bg;$('c_dims').value=dm;applyC('bg',bg);applyC('dims',dm)}
+$('bTheme').onclick=e=>{const l=document.documentElement.dataset.theme!=='light';theme(l);e.target.textContent=l?'🌙 Dark':'☀ Light';build()};
+// ---------- loop
+function resize(){const w=vp.clientWidth,h=vp.clientHeight;renderer.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener('resize',resize);new ResizeObserver(resize).observe(vp);
+let ef=0;(function loop(){requestAnimationFrame(loop);ef+=(S.exp-ef)*.08;
+ members.forEach(m=>{const[y,h]=offs(m),sg=m.dir==='x'?Math.sign(m.base.z)||0:Math.sign(m.base.x)||0;m.g.position.set(m.base.x+(m.dir==='z'?sg*h*ef:0),m.base.y+y*ef,m.base.z+(m.dir==='x'?sg*h*ef:0))});
+ if(boxH&&sel)boxH.box.setFromObject(sel.g);ctl.update();renderer.render(scene,cam)})();
+build();resize();view('iso');
+</script></body></html>
